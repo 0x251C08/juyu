@@ -1,0 +1,139 @@
+//! Memory manipulation, slice algorithms, and the polymorphic Allocator interface.
+
+pub const AllocatorError = error {
+    OutOfMemory,
+};
+
+/// Polymorphic virtual table for Allocator implementations.
+pub struct VTable {
+    alloc: *const fn (ctx: *anyopaque, len: usize, ptrAlign: u16): AllocatorError![]u8 callconv(.C),
+    resize: *const fn (ctx: *anyopaque, buf: []u8, bufAlign: u16, newLen: usize): bool callconv(.C),
+    free: *const fn (ctx: *anyopaque, buf: []u8, bufAlign: u16): void callconv(.C),
+}
+
+/// The universal polymorphic Allocator interface.
+pub struct Allocator {
+    ptr: *anyopaque,
+    vtable: *const VTable,
+
+    pub fn alloc(self: *const Allocator, comptime T: type, count: usize): AllocatorError![]T {
+        let byteCount = count * @sizeOf(T);
+        let alignment = @cast(u16, @alignOf(T));
+        let rawBytes = try (self.vtable.alloc)(ctx: self.ptr, len: byteCount, ptrAlign: alignment);
+        let typedPtr: [*]T = @ptrCast(rawBytes.ptr);
+        => typedPtr[0..count];
+    }
+
+    pub fn create(self: *const Allocator, comptime T: type): AllocatorError!*T {
+        let slice = try self.alloc(comptime T: T, count: 1);
+        => &slice[0];
+    }
+
+    pub fn destroy(self: *const Allocator, ptr: anytype) {
+        let slice: []@TypeOf(ptr.*) = ptr[0..1];
+        self.free(slice: slice);
+    }
+
+    pub fn free(self: *const Allocator, slice: anytype) {
+        let byteLen = slice.len * @sizeOf(@TypeOf(slice[0]));
+        let alignment = @cast(u16, @alignOf(@TypeOf(slice[0])));
+        let rawSlice: []u8 = @ptrCast(slice);
+        (self.vtable.free)(ctx: self.ptr, buf: rawSlice[0..byteLen], bufAlign: alignment);
+    }
+
+    pub fn realloc(self: *const Allocator, slice: anytype, newCount: usize): AllocatorError![]@TypeOf(slice[0]) {
+        type T = @TypeOf(slice[0]);
+        let oldByteLen = slice.len * @sizeOf(T);
+        let newByteLen = newCount * @sizeOf(T);
+        let alignment = @cast(u16, @alignOf(T));
+        let rawSlice: []u8 = @ptrCast(slice);
+
+        if ((self.vtable.resize)(ctx: self.ptr, buf: rawSlice[0..oldByteLen], bufAlign: alignment, newLen: newByteLen)) {
+            let typedPtr: [*]T = @ptrCast(slice.ptr);
+            => typedPtr[0..newCount];
+        } else {
+            let newSlice = try self.alloc(comptime T: T, count: newCount);
+            let copyCount = if (slice.len < newCount) slice.len else newCount;
+            copy(dest: newSlice[0..copyCount], source: slice[0..copyCount]);
+            self.free(slice: slice);
+            => newSlice;
+        }
+    }
+}
+
+/// Compares two slices for element-by-element equality.
+pub fn eql(a: anytype, b: anytype): bool {
+    if (a.len != b.len) {
+        => false;
+    }
+    for (var i: usize = 0; i < a.len; i += 1) {
+        if (a[i] != b[i]) {
+            => false;
+        }
+    }
+    => true;
+}
+
+/// Copies elements from source to dest, returning the number of elements copied.
+pub fn copy(dest: anytype, source: anytype): usize {
+    let count = if (dest.len < source.len) dest.len else source.len;
+    for (var i: usize = 0; i < count; i += 1) {
+        dest[i] = source[i];
+    }
+    => count;
+}
+
+/// Sets all elements of a slice to the specified value.
+pub fn set(dest: anytype, value: anytype) {
+    for (var i: usize = 0; i < dest.len; i += 1) {
+        dest[i] = value;
+    }
+}
+
+/// Finds the first index of needle in slice, or returns null.
+pub fn indexOf(slice: anytype, needle: anytype): ?usize {
+    for (var i: usize = 0; i < slice.len; i += 1) {
+        if (slice[i] == needle) {
+            => i;
+        }
+    }
+    => null;
+}
+
+/// Checks if a slice starts with a given prefix slice.
+pub fn startsWith(slice: anytype, prefix: anytype): bool {
+    if (slice.len < prefix.len) {
+        => false;
+    }
+    => eql(a: slice[0..prefix.len], b: prefix);
+}
+
+/// Checks if a slice ends with a given suffix slice.
+pub fn endsWith(slice: anytype, suffix: anytype): bool {
+    if (slice.len < suffix.len) {
+        => false;
+    }
+    => eql(a: slice[(slice.len - suffix.len)..slice.len], b: suffix);
+}
+
+/// Calculates the length of a null-terminated pointer and returns a slice.
+pub fn span(ptr: [*:0]const u8): []const u8 {
+    var len: usize = 0;
+    while (ptr[len] != 0) {
+        len += 1;
+    }
+    => ptr[0..len];
+}
+
+/// Returns a zero-initialized value of type T.
+pub fn zeroes(comptime T: type): T {
+    var val: T = undefined;
+    let byteSlice: []u8 = @ptrCast(&val);
+    set(dest: byteSlice[0..@sizeOf(T)], value: 0);
+    => val;
+}
+
+/// Rounds up an address to the specified alignment.
+pub fn alignForward(addr: usize, alignment: usize): usize {
+    => (addr + (alignment - 1)) & ~(alignment - 1);
+}

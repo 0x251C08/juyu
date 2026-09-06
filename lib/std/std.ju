@@ -1,0 +1,25 @@
+//! The Juyu Standard Library Root Module
+//! Provides the unified 'std' namespace implicitly available across all Juyu source files.
+
+pub let mem = import("mem.ju");
+pub let heap = import("heap.ju");
+pub let io = import("io.ju");
+pub let fs = import("fs.ju");
+pub let process = import("process.ju");
+pub let net = import("net.ju");
+pub let time = import("time.ju");
+pub let sync = import("sync.ju");
+pub let math = import("math.ju");
+pub let fmt = import("fmt.ju");
+pub let debug = import("debug.ju");
+
+// Common top-level re-exports for maximum ergonomics:
+pub type Allocator = mem.Allocator;
+pub type Reader = io.Reader;
+pub type Writer = io.Writer;
+pub type ArrayList = heap.ArrayList;
+pub type ArrayListUnmanaged = heap.ArrayListUnmanaged;
+pub type Instant = time.Instant;
+pub type Duration = time.Duration;
+pub type File = fs.File;
+pub type Dir = fs.Dir;

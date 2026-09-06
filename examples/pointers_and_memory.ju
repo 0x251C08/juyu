@@ -1,0 +1,52 @@
+//! Memory management, safe non-null pointers, and optionals in Juyu.
+
+pub struct Vector3 {
+    x: f32,
+    y: f32,
+    z: f32,
+
+    pub static fn init(x: f32, y: f32, z: f32): Vector3 {
+        => Vector3 { .x = x, .y = y, .z = z };
+    }
+
+    pub fn lengthSquared(self: *const Vector3): f32 {
+        => self.x * self.x + self.y * self.y + self.z * self.z;
+    }
+}
+
+pub fn main(): !void {
+    // 1. Explicit allocator with leak detection:
+    var gpa = std.heap.GeneralPurposeAllocator.init();
+    defer {
+        if (!gpa.deinit()) {
+            std.io.println(msg: "Memory leak detected!");
+        }
+    };
+    let alloc = gpa.allocator();
+
+    // 2. Dynamic list with explicit allocator:
+    var numbers = try std.heap.ArrayList(i32).init(allocator: alloc);
+    defer numbers.deinit();
+
+    try numbers.append(item: 100);
+    try numbers.append(item: 200);
+    try numbers.append(item: 300);
+
+    // 3. Pointers and Optionals:
+    let val: i32 = 42;
+    let safe_ptr: *const i32 = &val;
+
+    var maybe_ptr: ?*i32 = null;
+
+    if (let active = maybe_ptr) {
+        active.* += 1;
+    } else {
+        std.io.println(msg: "Optional pointer is safely null");
+    }
+
+    // 4. Struct instantiation and method call:
+    let v = Vector3.init(x: 1.0, y: 2.0, z: 3.0);
+    let lenSq = v.lengthSquared();
+
+    std.io.println(msg: "Memory and pointer demo completed successfully.");
+}

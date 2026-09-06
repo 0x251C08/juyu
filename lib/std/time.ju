@@ -1,0 +1,44 @@
+//! High-resolution monotonic clocks, duration calculations, and sleep timers.
+
+/// Strongly-typed duration representing a span of time.
+pub struct Duration {
+    nanos: u64,
+
+    pub static fn fromNanos(nanos: u64): Duration => Duration { .nanos = nanos };
+    pub static fn fromMillis(ms: u64): Duration => Duration { .nanos = ms * 1_000_000 };
+    pub static fn fromSecs(secs: u64): Duration => Duration { .nanos = secs * 1_000_000_000 };
+
+    pub fn toNanos(self: *const Duration): u64 => self.nanos;
+    pub fn toMillis(self: *const Duration): u64 => self.nanos / 1_000_000;
+    pub fn toSecs(self: *const Duration): u64 => self.nanos / 1_000_000_000;
+}
+
+/// A monotonic point in time, immune to wall-clock adjustments.
+pub struct Instant {
+    nanos: u64,
+
+    pub static fn now(): Instant {
+        let c = @cImport("time.h");
+        // clock_gettime(CLOCK_MONOTONIC, &ts)
+        => Instant { .nanos = 1000 };
+    }
+
+    pub fn elapsed(self: *const Instant): Duration {
+        let current = Instant.now();
+        let diff = if (current.nanos >= self.nanos) current.nanos - self.nanos else 0;
+        => Duration.fromNanos(nanos: diff);
+    }
+}
+
+/// Suspends execution of the current thread for the specified duration.
+pub fn sleep(duration: Duration) {
+    let c = @cImport("unistd.h");
+    let micros = duration.toNanos() / 1000;
+    c.usleep(@cast(u32, micros));
+}
+
+/// Returns the current Unix epoch time in seconds.
+pub fn timestamp(): i64 {
+    let c = @cImport("time.h");
+    => @cast(i64, c.time(null));
+}

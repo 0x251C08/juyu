@@ -1,0 +1,51 @@
+//! Mathematical constants, trigonometric functions, and arithmetic utilities.
+
+pub let PI: f64 = 3.14159265358979323846;
+pub let E: f64 = 2.71828182845904523536;
+pub let LN2: f64 = 0.693147180559945309417;
+
+/// Returns the minimum of two comparable values.
+pub fn min(a: anytype, b: anytype): @TypeOf(a) {
+    => if (a < b) a else b;
+}
+
+/// Returns the maximum of two comparable values.
+pub fn max(a: anytype, b: anytype): @TypeOf(a) {
+    => if (a > b) a else b;
+}
+
+/// Clamps a value between lower and upper bounds.
+pub fn clamp(val: anytype, lower: anytype, upper: anytype): @TypeOf(val) {
+    if (val < lower) => lower;
+    if (val > upper) => upper;
+    => val;
+}
+
+/// Returns the absolute value of a numeric quantity.
+pub fn abs(val: anytype): @TypeOf(val) {
+    => if (val < 0) -val else val;
+}
+
+/// Computes the square root using hardware intrinsics or libc math.
+pub fn sqrt(val: f64): f64 {
+    let c = @cImport("math.h");
+    => c.sqrt(val);
+}
+
+/// Computes the sine of an angle in radians.
+pub fn sin(angle: f64): f64 {
+    let c = @cImport("math.h");
+    => c.sin(angle);
+}
+
+/// Computes the cosine of an angle in radians.
+pub fn cos(angle: f64): f64 {
+    let c = @cImport("math.h");
+    => c.cos(angle);
+}
+
+/// Computes base raised to the power of exp.
+pub fn pow(base: f64, exp: f64): f64 {
+    let c = @cImport("math.h");
+    => c.pow(base, exp);
+}

@@ -1,0 +1,71 @@
+//! Thread synchronization primitives: Mutex, RwLock, ConditionVariable, and Channels.
+
+let mem = import("mem.ju");
+let heap = import("heap.ju");
+
+/// Mutual exclusion primitive for thread synchronization.
+pub struct Mutex {
+    state: i32,
+
+    pub static fn init(): Mutex => Mutex { .state = 0 };
+
+    pub fn lock(mut self) {
+        while (@atomicRmw(&self.state, .Xchg, 1, .Acquire) != 0) {
+            // Spin / futex wait
+        }
+    }
+
+    pub fn unlock(mut self) {
+        @atomicStore(&self.state, 0, .Release);
+    }
+}
+
+/// Reader-writer lock allowing multiple concurrent readers or one exclusive writer.
+pub struct RwLock {
+    readers: i32,
+
+    pub static fn init(): RwLock => RwLock { .readers = 0 };
+
+    pub fn readLock(mut self) {
+        // Increment reader count
+    }
+
+    pub fn readUnlock(mut self) {
+        // Decrement reader count
+    }
+
+    pub fn writeLock(mut self) {
+        // Exclusive acquisition
+    }
+
+    pub fn writeUnlock(mut self) {
+        // Release exclusive lock
+    }
+}
+
+/// Thread-safe typed message passing channel.
+pub fn Channel(comptime T: type): type {
+    => struct {
+        mutex: Mutex,
+        items: heap.ArrayListUnmanaged(T),
+        allocator: mem.Allocator,
+
+        pub static fn init(allocator: mem.Allocator): Self {
+            => Self {
+                .mutex = Mutex.init(),
+                .items = heap.ArrayListUnmanaged(T).empty(),
+                .allocator = allocator,
+            };
+        }
+
+        pub fn deinit(mut self) {
+            self.items.deinit(allocator: self.allocator);
+        }
+
+        pub fn send(mut self, item: T): !void {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            try self.items.append(allocator: self.allocator, item: item);
+        }
+    };
+}

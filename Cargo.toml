@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "compiler",
+    "driver",
+]
+resolver = "2"

@@ -1,0 +1,32 @@
+//! Explicit allocators, Arena memory, and dynamic collections in Juyu.
+
+pub fn main(): !void {
+    std.io.println(msg: "--- Memory & Allocators Showcase ---");
+
+    // 1. General Purpose Allocator with leak detection:
+    var gpa = std.heap.GeneralPurposeAllocator.init();
+    defer {
+        if (!gpa.deinit()) {
+            std.io.println(msg: "ERROR: Memory leak in GPA!");
+        } else {
+            std.io.println(msg: "GPA clean teardown: 0 leaks detected.");
+        }
+    };
+    let baseAlloc = gpa.allocator();
+
+    // 2. Arena Allocator wrapping GPA:
+    var arena = std.heap.ArenaAllocator.init(childAllocator: baseAlloc);
+    defer arena.deinit(); // Frees all arena allocations at once
+    let arenaAlloc = arena.allocator();
+
+    // 3. Dynamic ArrayList storing its own Allocator:
+    var list = try std.heap.ArrayList(i32).init(allocator: arenaAlloc);
+    defer list.deinit();
+
+    for (var i = 1; i <= 5; i += 1) {
+        try list.append(item: i * 10);
+    }
+
+    std.io.println(msg: $"List count: {list.len()}");
+    std.io.printlnInt(val: @cast(i64, list.get(index: 2).*));
+}

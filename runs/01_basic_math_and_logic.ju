@@ -1,0 +1,32 @@
+//! Basic math, scalar bit-widths, wrapping arithmetic, and conditionals in Juyu.
+
+pub fn main(): !void {
+    // 1. Standard scalar numbers and arbitrary bit-widths:
+    let standardInt: i32 = 42;
+    let customPrecision: i24 = 0x7FFFF;
+    let nibble: u4 = 0xF;
+    let singleBit: u1 = 1;
+
+    std.io.println(msg: "--- Juyu Math & Logic Demo ---");
+
+    // 2. Pure single-expression functions:
+    let sum = add(a: standardInt, b: 100);
+    let product = multiply(x: 5, y: 8);
+
+    // 3. Wrapping arithmetic operators (+%, -%, *%):
+    let maxByte: u8 = 255;
+    let wrappedByte = maxByte +% 1; // Wraps modularly to 0 without panic
+
+    // 4. Ternary / if-else expressions:
+    let status = if (sum > 100) "large" else "small";
+
+    std.io.println(msg: $"Calculation status: {status}");
+}
+
+pub fn add(a: i32, b: i32): i32 => a + b;
+pub fn multiply(x: i32, y: i32): i32 => x * y;
+
+test "verify wrapping arithmetic" {
+    let max: u8 = 255;
+    @assert(max +% 1 == 0);
+}

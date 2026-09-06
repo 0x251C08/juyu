@@ -1,0 +1,40 @@
+//! Enums with backing integer types, tagged unions, and pattern matching in Juyu.
+
+// 1. Enum with explicit backing integer type:
+pub enum(u8) HttpMethod {
+    Get = 1,
+    Post = 2,
+    Put = 3,
+    Delete = 4,
+}
+
+// 2. Safe tagged union (sum type) with variants:
+pub union(enum) Event {
+    Click: Point,
+    KeyPress: u8,
+    Quit,
+}
+
+pub struct Point {
+    x: i32,
+    y: i32,
+}
+
+pub fn handleEvent(event: Event): []const u8 {
+    // 3. Exhaustive match expression with arrow arms:
+    let description = match (event) {
+        .Click(let pt) => "Click event received",
+        .KeyPress(let key) => "Key pressed event",
+        .Quit => "Quit event received",
+        else => "Unhandled event",
+    };
+    => description;
+}
+
+pub fn main(): !void {
+    let pt = Point { .x = 100, .y = 200 };
+    let clickEvt = Event { .Click = pt };
+
+    let desc = handleEvent(event: clickEvt);
+    std.io.println(msg: desc);
+}

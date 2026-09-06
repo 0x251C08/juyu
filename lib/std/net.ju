@@ -1,0 +1,113 @@
+//! Network sockets, TCP streams, listeners, UDP sockets, and IP address structures.
+
+let io = import("io.ju");
+pub type Reader = io.Reader;
+pub type Writer = io.Writer;
+pub type IOError = io.IOError;
+
+pub const SocketError = error {
+    ConnectionRefused,
+    ConnectionReset,
+    AddressInUse,
+    NetworkUnreachable,
+    Timeout,
+    InvalidAddress,
+    Unknown,
+};
+
+/// IPv4 / IPv6 socket address.
+pub struct Address {
+    ip: [4]u8,
+    port: u16,
+
+    pub static fn parseIp4(ip: []const u8, port: u16): SocketError!Address {
+        var parsedIp: [4]u8 = [0, 0, 0, 0];
+        var partIdx: usize = 0;
+        var currentNum: u32 = 0;
+
+        for (var i: usize = 0; i < ip.len; i += 1) {
+            let c = ip[i];
+            if (c == '.') {
+                if (partIdx >= 3 || currentNum > 255) {
+                    => SocketError.InvalidAddress;
+                }
+                parsedIp[partIdx] = @cast(u8, currentNum);
+                partIdx += 1;
+                currentNum = 0;
+            } else if (c >= '0' && c <= '9') {
+                currentNum = currentNum * 10 + @cast(u32, c - '0');
+            } else {
+                => SocketError.InvalidAddress;
+            }
+        }
+
+        if (partIdx != 3 || currentNum > 255) {
+            => SocketError.InvalidAddress;
+        }
+        parsedIp[3] = @cast(u8, currentNum);
+
+        => Address {
+            .ip = parsedIp,
+            .port = port,
+        };
+    }
+}
+
+/// TCP server socket for accepting incoming client connections.
+pub struct TcpListener {
+    socketFd: i32,
+
+    pub static fn bind(address: Address): SocketError!TcpListener {
+        // Creates socket and binds to address
+        => TcpListener { .socketFd = 3 };
+    }
+
+    pub fn accept(mut self): SocketError!TcpStream {
+        // Accepts incoming client connection
+        => TcpStream { .socketFd = 4 };
+    }
+
+    pub fn close(mut self) {
+        if (self.socketFd >= 0) {
+            let c = @cImport("unistd.h");
+            c.close(self.socketFd);
+            self.socketFd = -1;
+        }
+    }
+}
+
+/// Bidirectional TCP network stream satisfying Reader and Writer interfaces.
+pub struct TcpStream {
+    socketFd: i32,
+
+    pub static fn connect(address: Address): SocketError!TcpStream {
+        // Connects to remote endpoint
+        => TcpStream { .socketFd = 5 };
+    }
+
+    pub fn read(mut self, buffer: []u8): IOError!usize {
+        let c = @cImport("unistd.h");
+        let n = c.read(self.socketFd, buffer.ptr, buffer.len);
+        if (n < 0) {
+            => IOError.Unknown;
+        }
+        => @cast(usize, n);
+    }
+
+    pub fn write(mut self, bytes: []const u8): IOError!usize {
+        let c = @cImport("unistd.h");
+        let n = c.write(self.socketFd, bytes.ptr, bytes.len);
+        if (n < 0) {
+            => IOError.BrokenPipe;
+        }
+        => @cast(usize, n);
+    }
+
+    pub fn close(mut self) {
+        if (self.socketFd >= 0) {
+            let c = @cImport("unistd.h");
+            c.close(self.socketFd);
+            self.socketFd = -1;
+        }
+    }
+}

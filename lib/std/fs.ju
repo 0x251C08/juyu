@@ -1,0 +1,163 @@
+//! Filesystem operations, file handles, capability directories, and path utilities.
+
+let io = import("io.ju");
+let mem = import("mem.ju");
+
+pub type Allocator = mem.Allocator;
+pub type Reader = io.Reader;
+pub type Writer = io.Writer;
+pub type IOError = io.IOError;
+
+pub const FileOpenError = error {
+    FileNotFound,
+    AccessDenied,
+    PathAlreadyExists,
+    IsDir,
+    NotDir,
+    SystemResources,
+    Unknown,
+};
+
+pub enum(u8) OpenMode {
+    ReadOnly = 1,
+    WriteOnly = 2,
+    ReadWrite = 3,
+}
+
+/// An open file handle implementing Reader and Writer interfaces.
+pub struct File {
+    handle: *anyopaque,
+
+    pub fn close(mut self) {
+        let c = @cImport("stdio.h");
+        c.fclose(@ptrCast(self.handle));
+        self.handle = null;
+    }
+
+    pub fn read(mut self, buffer: []u8): IOError!usize {
+        let c = @cImport("stdio.h");
+        let n = c.fread(buffer.ptr, 1, buffer.len, @ptrCast(self.handle));
+        if (n < 0) {
+            => IOError.Unknown;
+        }
+        => @cast(usize, n);
+    }
+
+    pub fn write(mut self, bytes: []const u8): IOError!usize {
+        let c = @cImport("stdio.h");
+        let n = c.fwrite(bytes.ptr, 1, bytes.len, @ptrCast(self.handle));
+        if (n < 0) {
+            => IOError.BrokenPipe;
+        }
+        => @cast(usize, n);
+    }
+
+    pub fn seekTo(mut self, offset: i64): IOError!void {
+        let c = @cImport("stdio.h");
+        if (c.fseek(@ptrCast(self.handle), offset, 0) != 0) {
+            => IOError.Unknown;
+        }
+    }
+
+    pub fn readToEndAlloc(mut self, allocator: Allocator, maxBytes: usize): ![]u8 {
+        var list = try heap.ArrayList(u8).init(allocator: allocator);
+        errdefer list.deinit();
+
+        var chunk: [4096]u8 = undefined;
+        while (true) {
+            let n = try self.read(buffer: chunk[0..4096]);
+            if (n == 0) {
+                break;
+            }
+            if (list.len() + n > maxBytes) {
+                => IOError.SystemResources;
+            }
+            for (var i: usize = 0; i < n; i += 1) {
+                try list.append(item: chunk[i]);
+            }
+        }
+        => list.unmanaged.items;
+    }
+}
+
+/// Capability directory handle for sandboxed filesystem access.
+pub struct Dir {
+    pathPrefix: []const u8,
+
+    pub fn openFile(self: *const Dir, filePath: []const u8, mode: OpenMode): FileOpenError!File {
+        => openFile(filePath: filePath, mode: mode);
+    }
+
+    pub fn createFile(self: *const Dir, filePath: []const u8): FileOpenError!File {
+        => createFile(filePath: filePath);
+    }
+}
+
+/// Returns a capability Dir representing the current working directory.
+pub fn cwd(): Dir {
+    => Dir { .pathPrefix = "." };
+}
+
+/// Direct shortcut to open a file.
+pub fn openFile(filePath: []const u8, mode: OpenMode): FileOpenError!File {
+    let c = @cImport("stdio.h");
+    let modeStr = match (mode) {
+        .ReadOnly => "rb\0",
+        .WriteOnly => "wb\0",
+        .ReadWrite => "r+b\0",
+    };
+
+    // Construct null-terminated path on stack or heap:
+    let fp: *anyopaque = c.fopen(filePath.ptr, modeStr.ptr);
+    if (fp == null) {
+        => FileOpenError.FileNotFound;
+    }
+    => File { .handle = fp };
+}
+
+/// Direct shortcut to create or truncate a file for writing.
+pub fn createFile(filePath: []const u8): FileOpenError!File {
+    => openFile(filePath: filePath, mode: .WriteOnly);
+}
+
+// =========================================================================
+// Path Utilities
+// =========================================================================
+
+pub let path = struct {
+    pub fn extension(filePath: []const u8): []const u8 {
+        var i = filePath.len;
+        while (i > 0) {
+            i -= 1;
+            if (filePath[i] == '.') {
+                => filePath[i..filePath.len];
+            }
+            if (filePath[i] == '/' || filePath[i] == '\\') {
+                break;
+            }
+        }
+        => "";
+    }
+
+    pub fn basename(filePath: []const u8): []const u8 {
+        var i = filePath.len;
+        while (i > 0) {
+            i -= 1;
+            if (filePath[i] == '/' || filePath[i] == '\\') {
+                => filePath[(i + 1)..filePath.len];
+            }
+        }
+        => filePath;
+    }
+
+    pub fn dirname(filePath: []const u8): []const u8 {
+        var i = filePath.len;
+        while (i > 0) {
+            i -= 1;
+            if (filePath[i] == '/' || filePath[i] == '\\') {
+                => filePath[0..i];
+            }
+        }
+        => ".";
+    }
+};

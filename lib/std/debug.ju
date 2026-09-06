@@ -1,0 +1,30 @@
+//! Debug assertions, panic handling, stack traces, and diagnostics.
+
+let io = import("io.ju");
+
+type PanicHook = *const fn (msg: []const u8): void;
+var CUSTOM_PANIC_HOOK: ?PanicHook = null;
+
+/// Triggers a fatal panic, printing diagnostics and aborting execution.
+pub fn panic(msg: []const u8) {
+    if (let hook = CUSTOM_PANIC_HOOK) {
+        hook(msg);
+    } else {
+        io.println(msg: "=== JUYU RUNTIME PANIC ===");
+        io.println(msg: msg);
+    }
+    let c = @cImport("stdlib.h");
+    c.abort();
+}
+
+/// Customizes the global panic hook handler.
+pub fn setHook(hook: PanicHook) {
+    CUSTOM_PANIC_HOOK = hook;
+}
+
+/// Asserts that a condition is true in Debug and ReleaseSafe modes.
+pub fn assert(condition: bool) {
+    if (!condition) {
+        panic(msg: "Assertion failed!");
+    }
+}

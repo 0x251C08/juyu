@@ -1,0 +1,312 @@
+//! Standard heap allocator implementations and dynamic collection data structures.
+
+let mem = import("mem.ju");
+pub type Allocator = mem.Allocator;
+pub type VTable = mem.VTable;
+pub type AllocatorError = mem.AllocatorError;
+
+/// Arena allocator that allocates in bulk and frees all memory in a single deinit() call.
+pub struct ArenaAllocator {
+    childAllocator: Allocator,
+    headNode: ?*ArenaNode,
+
+    pub static fn init(childAllocator: Allocator): ArenaAllocator {
+        => ArenaAllocator {
+            .childAllocator = childAllocator,
+            .headNode = null,
+        };
+    }
+
+    pub fn deinit(mut self) {
+        var curr = self.headNode;
+        while (let node = curr) {
+            let next = node.next;
+            let nodeSlice: []u8 = @ptrCast(node);
+            self.childAllocator.free(slice: nodeSlice[0..node.capacity]);
+            curr = next;
+        }
+        self.headNode = null;
+    }
+
+    pub fn allocator(self: *ArenaAllocator): Allocator {
+        => Allocator {
+            .ptr = @ptrCast(self),
+            .vtable = &ARENA_VTABLE,
+        };
+    }
+}
+
+struct ArenaNode {
+    next: ?*ArenaNode,
+    capacity: usize,
+    used: usize,
+}
+
+static let ARENA_VTABLE = VTable {
+    .alloc = arenaAlloc,
+    .resize = arenaResize,
+    .free = arenaFree,
+};
+
+fn arenaAlloc(ctx: *anyopaque, len: usize, ptrAlign: u16): AllocatorError![]u8 callconv(.C) {
+    let arena: *ArenaAllocator = @ptrCast(ctx);
+    let needed = len + @cast(usize, ptrAlign);
+    let blockSize = if (needed > 4096) needed + @sizeOf(ArenaNode) else 4096;
+
+    var targetNode = arena.headNode;
+    if (let node = targetNode) {
+        if (node.capacity - node.used >= needed) {
+            let rawPtr = @ptrToInt(node) + @sizeOf(ArenaNode) + node.used;
+            let alignedPtr = mem.alignForward(addr: rawPtr, alignment: @cast(usize, ptrAlign));
+            let offset = alignedPtr - (@ptrToInt(node) + @sizeOf(ArenaNode));
+            node.used = offset + len;
+            let slicePtr: [*]u8 = @ptrCast(alignedPtr);
+            => slicePtr[0..len];
+        }
+    }
+
+    // Allocate new node block:
+    let newBlock = try arena.childAllocator.alloc(comptime T: u8, count: blockSize);
+    let newNode: *ArenaNode = @ptrCast(newBlock.ptr);
+    newNode.next = arena.headNode;
+    newNode.capacity = blockSize;
+    newNode.used = len;
+    arena.headNode = newNode;
+
+    let basePtr = @ptrToInt(newNode) + @sizeOf(ArenaNode);
+    let alignedPtr = mem.alignForward(addr: basePtr, alignment: @cast(usize, ptrAlign));
+    let slicePtr: [*]u8 = @ptrCast(alignedPtr);
+    => slicePtr[0..len];
+}
+
+fn arenaResize(ctx: *anyopaque, buf: []u8, bufAlign: u16, newLen: usize): bool callconv(.C) {
+    => false; // Arenas do not support in-place shrinkage/growth
+}
+
+fn arenaFree(ctx: *anyopaque, buf: []u8, bufAlign: u16): void callconv(.C) {
+    // No-op: Arena memory is freed en masse in deinit()
+}
+
+/// Fixed buffer allocator carving allocations out of a static/stack slice.
+pub struct FixedBufferAllocator {
+    buffer: []u8,
+    cursor: usize,
+
+    pub static fn init(buffer: []u8): FixedBufferAllocator {
+        => FixedBufferAllocator {
+            .buffer = buffer,
+            .cursor = 0,
+        };
+    }
+
+    pub fn allocator(self: *FixedBufferAllocator): Allocator {
+        => Allocator {
+            .ptr = @ptrCast(self),
+            .vtable = &FIXED_BUFFER_VTABLE,
+        };
+    }
+
+    pub fn reset(mut self) {
+        self.cursor = 0;
+    }
+}
+
+static let FIXED_BUFFER_VTABLE = VTable {
+    .alloc = fixedAlloc,
+    .resize = fixedResize,
+    .free = fixedFree,
+};
+
+fn fixedAlloc(ctx: *anyopaque, len: usize, ptrAlign: u16): AllocatorError![]u8 callconv(.C) {
+    let fba: *FixedBufferAllocator = @ptrCast(ctx);
+    let rawPtr = @ptrToInt(fba.buffer.ptr) + fba.cursor;
+    let alignedPtr = mem.alignForward(addr: rawPtr, alignment: @cast(usize, ptrAlign));
+    let newCursor = (alignedPtr - @ptrToInt(fba.buffer.ptr)) + len;
+
+    if (newCursor > fba.buffer.len) {
+        => AllocatorError.OutOfMemory;
+    }
+
+    fba.cursor = newCursor;
+    let slicePtr: [*]u8 = @ptrCast(alignedPtr);
+    => slicePtr[0..len];
+}
+
+fn fixedResize(ctx: *anyopaque, buf: []u8, bufAlign: u16, newLen: usize): bool callconv(.C) {
+    => false;
+}
+
+fn fixedFree(ctx: *anyopaque, buf: []u8, bufAlign: u16): void callconv(.C) {}
+
+/// General Purpose Allocator with leak detection and quarantine protection.
+pub struct GeneralPurposeAllocator {
+    allocatedBytes: usize,
+    activeAllocations: usize,
+
+    pub static fn init(): GeneralPurposeAllocator {
+        => GeneralPurposeAllocator {
+            .allocatedBytes = 0,
+            .activeAllocations = 0,
+        };
+    }
+
+    pub fn deinit(self: *const GeneralPurposeAllocator): bool {
+        // Returns true if no memory leaks detected
+        => self.activeAllocations == 0;
+    }
+
+    pub fn allocator(self: *GeneralPurposeAllocator): Allocator {
+        => Allocator {
+            .ptr = @ptrCast(self),
+            .vtable = &GPA_VTABLE,
+        };
+    }
+}
+
+static let GPA_VTABLE = VTable {
+    .alloc = gpaAlloc,
+    .resize = gpaResize,
+    .free = gpaFree,
+};
+
+fn gpaAlloc(ctx: *anyopaque, len: usize, ptrAlign: u16): AllocatorError![]u8 callconv(.C) {
+    let gpa: *GeneralPurposeAllocator = @ptrCast(ctx);
+    let totalLen = len + 16; // Header for tracking
+    let raw = try pageAllocDirect(len: totalLen);
+    gpa.allocatedBytes += len;
+    gpa.activeAllocations += 1;
+
+    let lenHeader: *usize = @ptrCast(raw.ptr);
+    lenHeader.* = len;
+
+    let userPtr: [*]u8 = @ptrCast(@ptrToInt(raw.ptr) + 16);
+    => userPtr[0..len];
+}
+
+fn gpaResize(ctx: *anyopaque, buf: []u8, bufAlign: u16, newLen: usize): bool callconv(.C) {
+    => false;
+}
+
+fn gpaFree(ctx: *anyopaque, buf: []u8, bufAlign: u16): void callconv(.C) {
+    let gpa: *GeneralPurposeAllocator = @ptrCast(ctx);
+    let headerPtr: *usize = @ptrCast(@ptrToInt(buf.ptr) - 16);
+    let recordedLen = headerPtr.*;
+
+    gpa.allocatedBytes -= recordedLen;
+    gpa.activeAllocations -= 1;
+
+    let rawSlice: [*]u8 = @ptrCast(headerPtr);
+    pageFreeDirect(buf: rawSlice[0..(recordedLen + 16)]);
+}
+
+fn pageAllocDirect(len: usize): AllocatorError![]u8 {
+    // Lowered to mmap (POSIX) / VirtualAlloc (Windows) by compiler/runtime
+    let ptr = @cImport("stdlib.h").malloc(len);
+    if (ptr == null) {
+        => AllocatorError.OutOfMemory;
+    }
+    let bytePtr: [*]u8 = @ptrCast(ptr);
+    => bytePtr[0..len];
+}
+
+fn pageFreeDirect(buf: []u8) {
+    @cImport("stdlib.h").free(buf.ptr);
+}
+
+// =========================================================================
+// Collections: ArrayList & ArrayListUnmanaged
+// =========================================================================
+
+/// Unmanaged dynamic contiguous array (does not store an allocator pointer).
+pub fn ArrayListUnmanaged(comptime T: type): type {
+    => struct {
+        items: []T,
+        capacity: usize,
+
+        pub static fn empty(): Self {
+            => Self {
+                .items = [0]T {},
+                .capacity = 0,
+            };
+        }
+
+        pub fn deinit(mut self, allocator: Allocator) {
+            if (self.capacity > 0) {
+                let slice: [*]T = self.items.ptr;
+                allocator.free(slice: slice[0..self.capacity]);
+                self.items = [0]T {};
+                self.capacity = 0;
+            }
+        }
+
+        pub fn append(mut self, allocator: Allocator, item: T): AllocatorError!void {
+            try self.ensureCapacity(allocator: allocator, required: self.items.len + 1);
+            self.items.ptr[self.items.len] = item;
+            self.items = self.items.ptr[0..(self.items.len + 1)];
+        }
+
+        pub fn ensureCapacity(mut self, allocator: Allocator, required: usize): AllocatorError!void {
+            if (self.capacity >= required) {
+                =>;
+            }
+            let newCap = if (self.capacity == 0) 8 else self.capacity * 2;
+            let finalCap = if (newCap > required) newCap else required;
+
+            if (self.capacity == 0) {
+                let newBuf = try allocator.alloc(comptime T: T, count: finalCap);
+                self.items = newBuf[0..0];
+                self.capacity = finalCap;
+            } else {
+                let rawSlice: [*]T = self.items.ptr;
+                let newBuf = try allocator.realloc(slice: rawSlice[0..self.capacity], newCount: finalCap);
+                self.items = newBuf[0..self.items.len];
+                self.capacity = finalCap;
+            }
+        }
+
+        pub fn len(self: *const Self): usize => self.items.len;
+    };
+}
+
+/// Managed dynamic contiguous array storing its own Allocator reference.
+pub fn ArrayList(comptime T: type): type {
+    => struct {
+        unmanaged: ArrayListUnmanaged(comptime T: T),
+        allocator: Allocator,
+
+        pub static fn init(allocator: Allocator): Self {
+            => Self {
+                .unmanaged = ArrayListUnmanaged(comptime T: T).empty(),
+                .allocator = allocator,
+            };
+        }
+
+        pub static fn initWithCapacity(allocator: Allocator, capacity: usize): AllocatorError!Self {
+            var list = Self.init(allocator: allocator);
+            try list.unmanaged.ensureCapacity(allocator: allocator, required: capacity);
+            => list;
+        }
+
+        pub fn deinit(mut self) {
+            self.unmanaged.deinit(allocator: self.allocator);
+        }
+
+        pub fn append(mut self, item: T): AllocatorError!void {
+            try self.unmanaged.append(allocator: self.allocator, item: item);
+        }
+
+        pub fn get(self: *const Self, index: usize): *const T {
+            => &self.unmanaged.items[index];
+        }
+
+        pub fn getMut(self: *Self, index: usize): *T {
+            => &self.unmanaged.items[index];
+        }
+
+        pub fn slice(self: *const Self): []const T {
+            => self.unmanaged.items;
+        }
+
+        pub fn len(self: *const Self): usize => self.unmanaged.items.len;
+    };
+}

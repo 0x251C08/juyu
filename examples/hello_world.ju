@@ -1,0 +1,17 @@
+//! Hello World Example in Juyu
+
+pub fn main(): !void {
+    let language: []const u8 = "Juyu";
+    let version: f32 = 0.1;
+
+    std.io.println(msg: $"Hello, systems programming from {language} v{version}!");
+
+    let sum = add(a: 10, b: 20);
+    std.io.printlnInt(val: @cast(i64, sum));
+}
+
+pub fn add(a: i32, b: i32): i32 => a + b;
+
+test "verify addition" {
+    @assert(add(a: 2, b: 3) == 5);
+}

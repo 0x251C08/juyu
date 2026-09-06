@@ -1,0 +1,134 @@
+//! Standard input, output, streams, and Reader/Writer interfaces.
+
+let mem = import("mem.ju");
+
+pub const IOError = error {
+    UnexpectedEndOfStream,
+    BrokenPipe,
+    WriteZero,
+    PermissionDenied,
+    SystemResources,
+    Unknown,
+};
+
+/// Structural interface for byte streams capable of reading.
+pub interface Reader {
+    fn read(mut self, buffer: []u8): IOError!usize;
+}
+
+/// Structural interface for byte streams capable of writing.
+pub interface Writer {
+    fn write(mut self, bytes: []const u8): IOError!usize;
+}
+
+/// Rich helper methods available on any type satisfying Reader.
+extend Reader {
+    pub fn readAll(mut self, buffer: []u8): IOError!usize {
+        var totalRead: usize = 0;
+        while (totalRead < buffer.len) {
+            let n = try self.read(buffer: buffer[totalRead..buffer.len]);
+            if (n == 0) {
+                break;
+            }
+            totalRead += n;
+        }
+        => totalRead;
+    }
+
+    pub fn readByte(mut self): IOError!u8 {
+        var byteBuf: [1]u8 = undefined;
+        let n = try self.read(buffer: byteBuf[0..1]);
+        if (n == 0) {
+            => IOError.UnexpectedEndOfStream;
+        }
+        => byteBuf[0];
+    }
+}
+
+/// Rich helper methods available on any type satisfying Writer.
+extend Writer {
+    pub fn writeAll(mut self, bytes: []const u8): IOError!void {
+        var totalWritten: usize = 0;
+        while (totalWritten < bytes.len) {
+            let n = try self.write(bytes: bytes[totalWritten..bytes.len]);
+            if (n == 0) {
+                => IOError.WriteZero;
+            }
+            totalWritten += n;
+        }
+    }
+
+    pub fn writeByte(mut self, byte: u8): IOError!void {
+        let byteBuf: [1]u8 = [byte];
+        try self.writeAll(bytes: byteBuf[0..1]);
+    }
+
+    pub fn print(mut self, msg: []const u8): IOError!void {
+        try self.writeAll(bytes: msg);
+    }
+}
+
+// =========================================================================
+// Standard Streams: Stdin, Stdout, Stderr
+// =========================================================================
+
+pub struct StdoutWriter {
+    pub fn write(mut self, bytes: []const u8): IOError!usize {
+        let c = @cImport("stdio.h");
+        let written = c.fwrite(bytes.ptr, 1, bytes.len, c.stdout);
+        if (written < 0) {
+            => IOError.BrokenPipe;
+        }
+        => @cast(usize, written);
+    }
+}
+
+pub struct StderrWriter {
+    pub fn write(mut self, bytes: []const u8): IOError!usize {
+        let c = @cImport("stdio.h");
+        let written = c.fwrite(bytes.ptr, 1, bytes.len, c.stderr);
+        if (written < 0) {
+            => IOError.BrokenPipe;
+        }
+        => @cast(usize, written);
+    }
+}
+
+pub struct StdinReader {
+    pub fn read(mut self, buffer: []u8): IOError!usize {
+        let c = @cImport("stdio.h");
+        let readCount = c.fread(buffer.ptr, 1, buffer.len, c.stdin);
+        if (readCount < 0) {
+            => IOError.Unknown;
+        }
+        => @cast(usize, readCount);
+    }
+}
+
+/// Returns the standard output writer.
+pub fn getStdOut(): StdoutWriter => StdoutWriter {};
+
+/// Returns the standard error writer.
+pub fn getStdErr(): StderrWriter => StderrWriter {};
+
+/// Returns the standard input reader.
+pub fn getStdIn(): StdinReader => StdinReader {};
+
+/// Prints a string slice followed by a newline to standard output.
+pub fn println(msg: []const u8) {
+    var out = getStdOut();
+    _ = out.print(msg: msg) catch {};
+    _ = out.writeByte(byte: '\n') catch {};
+}
+
+/// Prints a string slice without a newline to standard output.
+pub fn print(msg: []const u8) {
+    var out = getStdOut();
+    _ = out.print(msg: msg) catch {};
+}
+
+/// Prints an integer value followed by a newline.
+pub fn printlnInt(val: i64) {
+    let c = @cImport("stdio.h");
+    c.printf("%lld\n", val);
+}

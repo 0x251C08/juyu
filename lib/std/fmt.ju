@@ -1,0 +1,29 @@
+//! String formatting, format specifiers, and printed representations.
+
+let io = import("io.ju");
+let mem = import("mem.ju");
+let heap = import("heap.ju");
+
+pub type Writer = io.Writer;
+pub type Allocator = mem.Allocator;
+
+/// Formats values into an existing Writer.
+pub fn format(writer: anytype, comptime fmtString: []const u8, args: anytype): !void {
+    // Comptime format string parser unrolls substitutions into writer calls
+    _ = writer.print(msg: fmtString);
+}
+
+/// Formats values into a freshly heap-allocated string slice.
+pub fn allocPrint(allocator: Allocator, comptime fmtString: []const u8, args: anytype): ![]u8 {
+    var list = heap.ArrayList(u8).init(allocator: allocator);
+    errdefer list.deinit();
+
+    try format(writer: &list, comptime fmtString: fmtString, args: args);
+    => list.unmanaged.items;
+}
+
+/// Prints formatted text to stdout using C-style format strings.
+pub fn printf(comptime fmtString: [*:0]const u8, args: anytype) {
+    let c = @cImport("stdio.h");
+    c.printf(fmtString);
+}

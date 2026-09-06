@@ -1,0 +1,8 @@
+[package]
+name = "juyu_compiler"
+version = "0.1.0"
+edition = "2021"
+authors = ["Armaan <armaans@example.com>"]
+description = "Core compiler library, lexer, Pratt parser, AST, and pipeline for the Juyu language."
+
+[dependencies]
