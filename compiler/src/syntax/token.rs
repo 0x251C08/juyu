@@ -29,7 +29,7 @@ pub enum TokenKind {
     Extern,
     Interface,
     Extend,
-    Pub,
+    Export,
     Static,
     Inline,
     Noinline,
@@ -57,6 +57,9 @@ pub enum TokenKind {
     Import,
     Enum,
     Union,
+    BitAnd,
+    BitOr,
+    BitXor,
 
     // Literals
     Int(i128, Option<String>), // value, optional bit-width suffix (e.g. "u8", "i24")
@@ -103,6 +106,7 @@ pub enum TokenKind {
 
     // Assignment Operators
     Eq,            // =
+    ColonEq,       // :=
     PlusEq,        // +=
     MinusEq,       // -=
     StarEq,        // *=

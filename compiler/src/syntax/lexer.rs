@@ -69,7 +69,14 @@ impl<'a> Lexer<'a> {
             '}' => TokenKind::CloseBrace,
             '[' => TokenKind::OpenBracket,
             ']' => TokenKind::CloseBracket,
-            ':' => TokenKind::Colon,
+            ':' => {
+                if self.peek() == Some('=') {
+                    self.advance();
+                    TokenKind::ColonEq
+                } else {
+                    TokenKind::Colon
+                }
+            },
             ';' => TokenKind::Semicolon,
             ',' => TokenKind::Comma,
             '~' => TokenKind::Tilde,
@@ -530,7 +537,7 @@ impl<'a> Lexer<'a> {
             "extern" => TokenKind::Extern,
             "interface" => TokenKind::Interface,
             "extend" => TokenKind::Extend,
-            "pub" => TokenKind::Pub,
+            "export" => TokenKind::Export,
             "static" => TokenKind::Static,
             "inline" => TokenKind::Inline,
             "noinline" => TokenKind::Noinline,
@@ -558,6 +565,9 @@ impl<'a> Lexer<'a> {
             "import" => TokenKind::Import,
             "enum" => TokenKind::Enum,
             "union" => TokenKind::Union,
+            "bitand" => TokenKind::BitAnd,
+            "bitor" => TokenKind::BitOr,
+            "bitxor" => TokenKind::BitXor,
             "true" => TokenKind::BoolLit(true),
             "false" => TokenKind::BoolLit(false),
             _ => TokenKind::Ident(ident),

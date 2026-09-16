@@ -59,7 +59,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_item(&mut self) -> Result<Item, String> {
-        let is_pub = self.match_token(&TokenKind::Pub);
+        let is_pub = self.match_token(&TokenKind::Export);
         let visibility = if is_pub { Visibility::Public } else { Visibility::Private };
 
         if self.match_token(&TokenKind::Import) {
@@ -172,7 +172,7 @@ impl<'a> Parser<'a> {
         self.expect(&TokenKind::OpenBrace, "'{' after extend type")?;
         let mut methods = Vec::new();
         while !self.check(&TokenKind::CloseBrace) {
-            let is_pub = self.match_token(&TokenKind::Pub);
+            let is_pub = self.match_token(&TokenKind::Export);
             let vis = if is_pub { Visibility::Public } else { Visibility::Private };
             if let Item::Function(func) = self.parse_function(vis)? {
                 methods.push(func);
@@ -334,8 +334,8 @@ impl<'a> Parser<'a> {
         let mut methods = Vec::new();
 
         while !self.check(&TokenKind::CloseBrace) {
-            if self.check(&TokenKind::Pub) || self.check(&TokenKind::Fn) || self.check(&TokenKind::Static) {
-                let is_pub = self.match_token(&TokenKind::Pub);
+            if self.check(&TokenKind::Export) || self.check(&TokenKind::Fn) || self.check(&TokenKind::Static) {
+                let is_pub = self.match_token(&TokenKind::Export);
                 let vis = if is_pub { Visibility::Public } else { Visibility::Private };
                 if let Item::Function(func) = self.parse_function(vis)? {
                     methods.push(func);
