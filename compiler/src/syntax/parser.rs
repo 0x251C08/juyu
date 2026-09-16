@@ -505,13 +505,20 @@ impl<'a> Parser<'a> {
             let base_type = TypeExpr::Named(name, span);
             if self.match_token(&TokenKind::Lt) {
                 let mut type_args = Vec::new();
-                while !self.check(&TokenKind::Gt) {
+                while !self.check(&TokenKind::Gt) && !self.check(&TokenKind::Shr) {
                     type_args.push(self.parse_type()?);
                     if !self.match_token(&TokenKind::Comma) {
                         break;
                     }
                 }
-                self.expect(&TokenKind::Gt, "'>' after generic type arguments")?;
+                
+                if self.check(&TokenKind::Shr) {
+                    let span = self.current.span;
+                    self.current = Token::new(TokenKind::Gt, Span { start: span.start + 1, end: span.end, line: span.line, col: span.col + 1 });
+                    self.previous = Token::new(TokenKind::Gt, Span { start: span.start, end: span.start + 1, line: span.line, col: span.col });
+                } else {
+                    self.expect(&TokenKind::Gt, "'>' after generic type arguments")?;
+                }
                 Ok(TypeExpr::Generic(Box::new(base_type), type_args, span))
             } else {
                 Ok(base_type)
@@ -694,7 +701,7 @@ impl<'a> Parser<'a> {
             }
 
             if self.match_token(&TokenKind::Bang) {
-                lhs = Expr::ForceUnwrap(Box::new(lhs), self.previous.span);
+                lhs = Expr::Try(Box::new(lhs), self.previous.span);
                 continue;
             }
 
