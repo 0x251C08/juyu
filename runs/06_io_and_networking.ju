@@ -1,20 +1,20 @@
 //! I/O streams, capability filesystem, networking, and high-resolution timers.
 
-pub fn main(): !void {
-    std.io.println(msg: "--- Juyu I/O, Filesystem & Network Demo ---");
+export fn main(): !void {
+    std.io.println("--- Juyu I/O, Filesystem & Network Demo ---");
 
     // 1. High-resolution timer:
-    let start = std.time.Instant.now();
+    let start := std.time.Instant.now();
 
     // 2. Capability-based filesystem operations:
-    let dir = std.fs.cwd();
-    std.io.println(msg: "Accessed current working directory via capability handle.");
+    let dir := std.fs.cwd();
+    std.io.println("Accessed current working directory via capability handle.");
 
     // 3. Network address parsing:
-    let addr = try std.net.Address.parseIp4(ip: "127.0.0.1", port: 8080);
-    std.io.println(msg: $"Parsed IPv4 address: port {addr.port}");
+    let addr := std.net.Address.parseIp4("127.0.0.1", 8080)!;
+    std.io.println($"Parsed IPv4 address: port {addr.port}");
 
     // 4. Time measurement:
-    let elapsed = start.elapsed();
-    std.io.println(msg: $"Operation completed in {elapsed.toMillis()} milliseconds.");
+    let elapsed := start.elapsed();
+    std.io.println($"Operation completed in {elapsed.toMillis()} milliseconds.");
 }

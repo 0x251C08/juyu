@@ -1,25 +1,25 @@
 //! Structs, methods, structural interfaces, and composition in Juyu.
 
-pub struct Entity {
+export struct Entity {
     id: u64,
     x: f32,
     y: f32,
 }
 
-pub struct Player {
+export struct Player {
     Entity, // Anonymous embedding: promotes fields and methods
-    name: []const u8,
+    name: &[const u8],
     health: i32,
 
-    pub static fn init(id: u64, name: []const u8): Player {
+    export static fn init(id: u64, name: &[const u8]): Player {
         => Player {
-            .Entity = Entity { .id = id, .x = 0.0, .y = 0.0 },
-            .name = name,
-            .health = 100,
+            Entity: Entity { id: id, x: 0.0, y: 0.0 },
+            name: name,
+            health: 100,
         };
     }
 
-    pub fn takeDamage(self: *Player, amount: i32) {
+    export fn takeDamage(&mut self, amount: i32) {
         self.health -= amount;
         if (self.health < 0) {
             self.health = 0;
@@ -28,27 +28,27 @@ pub struct Player {
 }
 
 // Structural interface satisfied automatically by any struct with matching method
-pub interface Describable {
-    fn describe(self: *const Self): []const u8;
+export interface Describable {
+    fn describe(&self): &[const u8];
 }
 
 extend Player {
-    pub fn describe(self: *const Player): []const u8 {
+    export fn describe(&self): &[const u8] {
         => self.name;
     }
 }
 
-pub fn printDescription(item: Describable) {
-    std.io.println(msg: item.describe());
+export fn printDescription(item: any Describable) {
+    std.io.println(item.describe());
 }
 
-pub fn main(): !void {
-    var p = Player.init(id: 1, name: "Hero");
-    p.takeDamage(amount: 25);
+export fn main(): !void {
+    let p := Player.init(1, "Hero");
+    p.takeDamage(25);
 
     // Access promoted Entity field directly:
-    let entityId = p.id;
+    let entityId := p.id;
 
-    printDescription(item: p);
-    std.io.println(msg: "Player initialized and took damage.");
+    printDescription(p);
+    std.io.println("Player initialized and took damage.");
 }

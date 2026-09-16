@@ -1,23 +1,23 @@
 //! Safe non-null pointers, zero-cost optionals, and null-coalescing in Juyu.
 
-pub struct UserProfile {
-    displayName: []const u8,
-    avatarUrl: ?[]const u8,
+export struct UserProfile {
+    displayName: &[const u8],
+    avatarUrl: ?&[const u8],
 }
 
-pub struct User {
+export struct User {
     id: u64,
     profile: ?UserProfile,
 }
 
-pub fn main(): !void {
-    std.io.println(msg: "--- Pointers & Optionals Demo ---");
+export fn main(): !void {
+    std.io.println("--- Pointers & Optionals Demo ---");
 
     // 1. Safe non-null pointer:
     var number: i32 = 42;
     let ptr: *i32 = &number;
     ptr.* += 8; // Postfix dereference operator
-    std.io.println(msg: $"Updated value via pointer: {ptr.*}");
+    std.io.println($"Updated value via pointer: {ptr.*}");
 
     // 2. Zero-cost nullable pointer:
     var maybePtr: ?*i32 = null;
@@ -25,21 +25,21 @@ pub fn main(): !void {
     if (let active = maybePtr) {
         active.* = 100;
     } else {
-        std.io.println(msg: "maybePtr is currently null");
+        std.io.println("maybePtr is currently null");
     }
 
     // Assign active pointer:
     maybePtr = ptr;
     if (let active = maybePtr) {
-        std.io.println(msg: $"Unwrapped active pointer successfully: {active.*}");
+        std.io.println($"Unwrapped active pointer successfully: {active.*}");
     }
 
     // 3. Optional structs and null-coalescing (??):
-    let user = User {
-        .id = 1001,
-        .profile = null,
+    let user := User {
+        id: 1001,
+        profile: null,
     };
 
-    let name = user.profile?.displayName ?? "Guest User";
-    std.io.println(msg: $"Resolved username: {name}");
+    let name := user.profile?.displayName ?? "Guest User";
+    std.io.println($"Resolved username: {name}");
 }
