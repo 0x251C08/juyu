@@ -60,6 +60,7 @@ pub enum TokenKind {
     BitAnd,
     BitOr,
     BitXor,
+    As,
 
     // Literals
     Int(i128, Option<String>), // value, optional bit-width suffix (e.g. "u8", "i24")

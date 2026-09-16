@@ -568,6 +568,7 @@ impl<'a> Lexer<'a> {
             "bitand" => TokenKind::BitAnd,
             "bitor" => TokenKind::BitOr,
             "bitxor" => TokenKind::BitXor,
+            "as" => TokenKind::As,
             "true" => TokenKind::BoolLit(true),
             "false" => TokenKind::BoolLit(false),
             _ => TokenKind::Ident(ident),

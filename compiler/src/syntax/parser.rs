@@ -430,13 +430,9 @@ impl<'a> Parser<'a> {
         let mut params = Vec::new();
 
         while !self.check(&TokenKind::CloseParen) {
-            let first_tok = self.expect_ident("parameter name")?;
-            let (label, name) = if let TokenKind::Ident(second) = self.current.kind.clone() {
-                self.advance();
-                (Some(first_tok), second)
-            } else {
-                (None, first_tok)
-            };
+            let name = self.expect_ident("parameter name")?;
+
+            let label = None;
 
             self.expect(&TokenKind::Colon, "':' after parameter name")?;
             let ty = self.parse_type()?;
@@ -506,7 +502,20 @@ impl<'a> Parser<'a> {
         if name == "anytype" {
             Ok(TypeExpr::Anytype(span))
         } else {
-            Ok(TypeExpr::Named(name, span))
+            let base_type = TypeExpr::Named(name, span);
+            if self.match_token(&TokenKind::Lt) {
+                let mut type_args = Vec::new();
+                while !self.check(&TokenKind::Gt) {
+                    type_args.push(self.parse_type()?);
+                    if !self.match_token(&TokenKind::Comma) {
+                        break;
+                    }
+                }
+                self.expect(&TokenKind::Gt, "'>' after generic type arguments")?;
+                Ok(TypeExpr::Generic(Box::new(base_type), type_args, span))
+            } else {
+                Ok(base_type)
+            }
         }
     }
 
@@ -609,13 +618,19 @@ impl<'a> Parser<'a> {
 
     fn parse_var_decl(&mut self, is_mut: bool) -> Result<VarDecl, String> {
         let name = self.expect_ident("variable name")?;
-        let ty = if self.match_token(&TokenKind::Colon) {
-            Some(self.parse_type()?)
+        
+        let ty;
+        if self.match_token(&TokenKind::ColonEq) {
+            ty = None;
         } else {
-            None
-        };
+            ty = if self.match_token(&TokenKind::Colon) {
+                Some(self.parse_type()?)
+            } else {
+                None
+            };
+            self.expect(&TokenKind::Eq, "'=' in variable declaration")?;
+        }
 
-        self.expect(&TokenKind::Eq, "'=' in variable declaration")?;
         let value = self.parse_expr()?;
 
         Ok(VarDecl {
@@ -675,6 +690,17 @@ impl<'a> Parser<'a> {
             if self.match_token(&TokenKind::Catch) {
                 let fallback = self.parse_expr()?;
                 lhs = Expr::Catch(Box::new(lhs), None, Box::new(fallback), self.previous.span);
+                continue;
+            }
+
+            if self.match_token(&TokenKind::Bang) {
+                lhs = Expr::ForceUnwrap(Box::new(lhs), self.previous.span);
+                continue;
+            }
+
+            if self.match_token(&TokenKind::As) {
+                let target_type = self.parse_type()?;
+                lhs = Expr::Cast(Box::new(lhs), target_type, self.previous.span);
                 continue;
             }
 
