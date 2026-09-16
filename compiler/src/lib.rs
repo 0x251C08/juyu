@@ -20,7 +20,7 @@ mod tests {
     #[test]
     fn test_lex_and_parse_simple_function() {
         let code = r#"
-            pub fn add(a: i32, b: i32): i32 {
+            export fn add(a: i32, b: i32): i32 {
                 => a + b;
             }
         "#;
@@ -31,15 +31,15 @@ mod tests {
     #[test]
     fn test_lex_and_parse_struct_and_methods() {
         let code = r#"
-            pub struct Point {
+            export struct Point {
                 x: f32,
                 y: f32,
 
-                pub static fn init(x: f32, y: f32): Point {
+                export static fn init(x: f32, y: f32): Point {
                     => Point { .x = x, .y = y };
                 }
 
-                pub fn length(self: *const Point): f32 {
+                export fn length(self: *const Point): f32 {
                     => math.sqrt(val: self.x * self.x + self.y * self.y);
                 }
             }
@@ -51,7 +51,7 @@ mod tests {
     #[test]
     fn test_parse_if_let_and_defer() {
         let code = r#"
-            pub fn process(maybe_ptr: ?*i32) {
+            export fn process(maybe_ptr: ?*i32) {
                 defer io.println(msg: "Done");
                 if (let active = maybe_ptr) {
                     active.* += 1;
