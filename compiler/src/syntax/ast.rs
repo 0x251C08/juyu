@@ -9,7 +9,7 @@ pub struct SourceFile {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Visibility {
-    Public,
+    Export,
     Private,
 }
 
@@ -174,7 +174,8 @@ pub enum TypeExpr {
     Named(String, Span),
     Pointer(Box<TypeExpr>, bool, Span), // inner, is_const
     Optional(Box<TypeExpr>, Span),
-    Slice(Box<TypeExpr>, bool, Span),
+    Slice(Box<TypeExpr>, Span),
+    Generic(Box<TypeExpr>, Vec<TypeExpr>, Span),
     Array(Box<TypeExpr>, usize, Span),
     SentinelSlice(Box<TypeExpr>, u8, Span),
     ErrorUnion(Option<Box<TypeExpr>>, Box<TypeExpr>, Span),
@@ -260,6 +261,7 @@ pub enum Expr {
     Catch(Box<Expr>, Option<String>, Box<Expr>, Span),
     NullCoalesce(Box<Expr>, Box<Expr>, Span),
     ForceUnwrap(Box<Expr>, Span),
+    Cast(Box<Expr>, TypeExpr, Span),
 }
 
 #[derive(Debug, Clone)]
@@ -329,4 +331,36 @@ pub enum UnaryOp {
     Not,
     BitNot,
     AddressOf,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::syntax::token::Span;
+
+    #[test]
+    fn test_ast_nodes_can_be_constructed() {
+        let span = Span::dummy();
+        
+        let vis = Visibility::Export;
+        
+        let slice_type = TypeExpr::Slice(Box::new(TypeExpr::Named("u8".to_string(), span)), span);
+        
+        let generic_type = TypeExpr::Generic(
+            Box::new(TypeExpr::Named("List".to_string(), span)),
+            vec![TypeExpr::Named("T".to_string(), span)],
+            span
+        );
+        
+        let expr = Expr::Cast(
+            Box::new(Expr::Int(42, None, span)),
+            TypeExpr::Named("u64".to_string(), span),
+            span
+        );
+        
+        assert_eq!(vis, Visibility::Export);
+        assert!(matches!(slice_type, TypeExpr::Slice(_, _)));
+        assert!(matches!(generic_type, TypeExpr::Generic(_, _, _)));
+        assert!(matches!(expr, Expr::Cast(_, _, _)));
+    }
 }
