@@ -43,7 +43,7 @@ export fn printDescription(item: any Describable) {
 }
 
 export fn main(): !void {
-    let p := Player.init(1, "Hero");
+    var p := Player.init(1, "Hero");
     p.takeDamage(25);
 
     // Access promoted Entity field directly:
