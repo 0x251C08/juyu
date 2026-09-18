@@ -82,7 +82,7 @@ Prerequisites: Rust toolchain (`cargo`), plus Clang ≥ 19 or GCC ≥ 14
 
 ```sh
 # 1. Clone the repo
-git clone https://github.com/anomalyco/juyulang.git
+git clone https://github.com/0x251C08/juyu.git
 cd juyulang
 
 # 2. Move the folder to /opt/
@@ -108,11 +108,11 @@ To uninstall: `sudo rm /usr/local/bin/juyu && sudo rm -rf /opt/juyulang`.
 
 No Rust toolchain needed. Grab the latest `juyu-linux-x86_64` (or
 `juyu-linux-aarch64`) asset from
-[GitHub Releases](https://github.com/anomalyco/juyulang/releases).
+[GitHub Releases](https://github.com/0x251C08/juyu/releases).
 
 ```sh
 # 1. Download the binary (replace v0.1.0 with the latest tag)
-curl -LO https://github.com/anomalyco/juyulang/releases/download/v0.1.0/juyu-linux-x86_64
+curl -LO https://github.com/0x251C08/juyu/releases/download/v0.1.0/juyu-linux-x86_64
 chmod +x juyu-linux-x86_64
 
 # 2. Move it into /opt/
