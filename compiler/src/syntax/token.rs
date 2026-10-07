@@ -10,11 +10,21 @@ pub struct Span {
 
 impl Span {
     pub fn new(start: usize, end: usize, line: usize, col: usize) -> Self {
-        Self { start, end, line, col }
+        Self {
+            start,
+            end,
+            line,
+            col,
+        }
     }
 
     pub fn dummy() -> Self {
-        Self { start: 0, end: 0, line: 1, col: 1 }
+        Self {
+            start: 0,
+            end: 0,
+            line: 1,
+            col: 1,
+        }
     }
 }
 
@@ -42,6 +52,7 @@ pub enum TokenKind {
     In,
     If,
     Else,
+    Return,
     Break,
     Continue,
     Defer,
@@ -80,59 +91,59 @@ pub enum TokenKind {
     Star,
     Slash,
     Percent,
-    PlusPercent,   // +%
-    MinusPercent,  // -%
-    StarPercent,   // *%
+    PlusPercent,  // +%
+    MinusPercent, // -%
+    StarPercent,  // *%
 
     // Bitwise Operators
-    Ampersand,     // &
-    Pipe,          // |
-    Caret,         // ^
-    Tilde,         // ~
-    Shl,           // <<
-    Shr,           // >>
+    Ampersand, // &
+    Pipe,      // |
+    Caret,     // ^
+    Tilde,     // ~
+    Shl,       // <<
+    Shr,       // >>
 
     // Logical Operators
-    AmpAmp,        // &&
-    PipePipe,      // ||
-    Bang,          // !
+    AmpAmp,   // &&
+    PipePipe, // ||
+    Bang,     // !
 
     // Comparison Operators
-    EqEq,          // ==
-    NotEq,         // !=
-    Lt,            // <
-    LtEq,          // <=
-    Gt,            // >
-    GtEq,          // >=
+    EqEq,  // ==
+    NotEq, // !=
+    Lt,    // <
+    LtEq,  // <=
+    Gt,    // >
+    GtEq,  // >=
 
     // Assignment Operators
-    Eq,            // =
-    ColonEq,       // :=
-    PlusEq,        // +=
-    MinusEq,       // -=
-    StarEq,        // *=
-    SlashEq,       // /=
+    Eq,      // =
+    ColonEq, // :=
+    PlusEq,  // +=
+    MinusEq, // -=
+    StarEq,  // *=
+    SlashEq, // /=
 
     // Control & Punctuation
-    FatArrow,          // =>
-    QuestionQuestion,  // ??
-    QuestionDot,       // ?.
-    DotStar,           // .*
-    Dot,               // .
-    DotDot,            // ..
-    DotDotDot,         // ...
-    Colon,             // :
-    Semicolon,         // ;
-    Comma,             // ,
-    Question,          // ?
+    FatArrow,         // =>
+    QuestionQuestion, // ??
+    QuestionDot,      // ?.
+    DotStar,          // .*
+    Dot,              // .
+    DotDot,           // ..
+    DotDotDot,        // ...
+    Colon,            // :
+    Semicolon,        // ;
+    Comma,            // ,
+    Question,         // ?
 
     // Delimiters
-    OpenParen,     // (
-    CloseParen,    // )
-    OpenBrace,     // {
-    CloseBrace,    // }
-    OpenBracket,   // [
-    CloseBracket,  // ]
+    OpenParen,    // (
+    CloseParen,   // )
+    OpenBrace,    // {
+    CloseBrace,   // }
+    OpenBracket,  // [
+    CloseBracket, // ]
 
     // Comments & Special
     DocComment(String),

@@ -46,7 +46,10 @@ impl<'a> Lexer<'a> {
     }
 
     fn current_pos(&self) -> usize {
-        self.chars.get(self.cursor).map(|&(idx, _)| idx).unwrap_or(self.source.len())
+        self.chars
+            .get(self.cursor)
+            .map(|&(idx, _)| idx)
+            .unwrap_or(self.source.len())
     }
 
     pub fn next_token(&mut self) -> Token {
@@ -58,7 +61,12 @@ impl<'a> Lexer<'a> {
 
         let ch = match self.advance() {
             Some(c) => c,
-            None => return Token::new(TokenKind::Eof, Span::new(start_pos, start_pos, start_line, start_col)),
+            None => {
+                return Token::new(
+                    TokenKind::Eof,
+                    Span::new(start_pos, start_pos, start_line, start_col),
+                )
+            }
         };
 
         let kind = match ch {
@@ -76,7 +84,7 @@ impl<'a> Lexer<'a> {
                 } else {
                     TokenKind::Colon
                 }
-            },
+            }
             ';' => TokenKind::Semicolon,
             ',' => TokenKind::Comma,
             '~' => TokenKind::Tilde,
@@ -350,7 +358,9 @@ impl<'a> Lexer<'a> {
                         }
                     }
                 }
-                '\n' => return TokenKind::Error("Unterminated single-line string literal".to_string()),
+                '\n' => {
+                    return TokenKind::Error("Unterminated single-line string literal".to_string())
+                }
                 other => content.push(other),
             }
         }
@@ -455,34 +465,49 @@ impl<'a> Lexer<'a> {
                 num_str.push(self.advance().unwrap());
                 while let Some(c) = self.peek() {
                     if c.is_ascii_hexdigit() || c == '_' {
-                        if c != '_' { num_str.push(c); }
+                        if c != '_' {
+                            num_str.push(c);
+                        }
                         self.advance();
                     } else {
                         break;
                     }
                 }
-                let val = i128::from_str_radix(&num_str[2..], 16).unwrap_or(0);
-                return TokenKind::Int(val, None);
+                return match i128::from_str_radix(&num_str[2..], 16) {
+                    Ok(val) => TokenKind::Int(val, None),
+                    Err(_) => TokenKind::Error("Invalid or overflowing hexadecimal literal".into()),
+                };
             } else if let Some('b') | Some('B') = self.peek() {
                 num_str.push(self.advance().unwrap());
                 while let Some(c) = self.peek() {
                     if c == '0' || c == '1' || c == '_' {
-                        if c != '_' { num_str.push(c); }
+                        if c != '_' {
+                            num_str.push(c);
+                        }
                         self.advance();
                     } else {
                         break;
                     }
                 }
-                let val = i128::from_str_radix(&num_str[2..], 2).unwrap_or(0);
-                return TokenKind::Int(val, None);
+                return match i128::from_str_radix(&num_str[2..], 2) {
+                    Ok(val) => TokenKind::Int(val, None),
+                    Err(_) => TokenKind::Error("Invalid or overflowing binary literal".into()),
+                };
             }
         }
 
         while let Some(c) = self.peek() {
             if c.is_ascii_digit() || c == '_' {
-                if c != '_' { num_str.push(c); }
+                if c != '_' {
+                    num_str.push(c);
+                }
                 self.advance();
-            } else if c == '.' && self.peek_next().map(|p| p.is_ascii_digit()).unwrap_or(false) {
+            } else if c == '.'
+                && self
+                    .peek_next()
+                    .map(|p| p.is_ascii_digit())
+                    .unwrap_or(false)
+            {
                 is_float = true;
                 num_str.push(c);
                 self.advance();
@@ -509,11 +534,20 @@ impl<'a> Lexer<'a> {
         }
 
         if is_float {
-            let val: f64 = num_str.parse().unwrap_or(0.0);
-            TokenKind::Float(val)
+            if suffix.is_some() {
+                return TokenKind::Error(
+                    "Float suffixes are not supported; use a type annotation".into(),
+                );
+            }
+            match num_str.parse::<f64>() {
+                Ok(val) if val.is_finite() => TokenKind::Float(val),
+                _ => TokenKind::Error("Invalid or overflowing floating literal".into()),
+            }
         } else {
-            let val: i128 = num_str.parse().unwrap_or(0);
-            TokenKind::Int(val, suffix)
+            match num_str.parse::<i128>() {
+                Ok(val) => TokenKind::Int(val, suffix),
+                Err(_) => TokenKind::Error("Invalid or overflowing integer literal".into()),
+            }
         }
     }
 
@@ -550,6 +584,7 @@ impl<'a> Lexer<'a> {
             "in" => TokenKind::In,
             "if" => TokenKind::If,
             "else" => TokenKind::Else,
+            "return" => TokenKind::Return,
             "break" => TokenKind::Break,
             "continue" => TokenKind::Continue,
             "defer" => TokenKind::Defer,

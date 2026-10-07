@@ -8,6 +8,7 @@ pub struct Parser<'a> {
     lexer: Lexer<'a>,
     current: Token,
     previous: Token,
+    allow_struct_init: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -17,6 +18,7 @@ impl<'a> Parser<'a> {
             lexer,
             current: first,
             previous: Token::new(TokenKind::Eof, Span::dummy()),
+            allow_struct_init: true,
         }
     }
 
@@ -60,7 +62,11 @@ impl<'a> Parser<'a> {
 
     fn parse_item(&mut self) -> Result<Item, String> {
         let is_export = self.match_token(&TokenKind::Export);
-        let visibility = if is_export { Visibility::Export } else { Visibility::Private };
+        let visibility = if is_export {
+            Visibility::Export
+        } else {
+            Visibility::Private
+        };
 
         if self.match_token(&TokenKind::Import) {
             return self.parse_import(self.previous.span);
@@ -90,11 +96,19 @@ impl<'a> Parser<'a> {
             return self.parse_union(visibility);
         }
 
-        if self.check(&TokenKind::Struct) || self.check(&TokenKind::Packed) || self.check(&TokenKind::Extern) {
+        if self.check(&TokenKind::Struct)
+            || self.check(&TokenKind::Packed)
+            || self.check(&TokenKind::Extern)
+        {
             return self.parse_struct(visibility);
         }
 
-        if self.check(&TokenKind::Fn) || self.check(&TokenKind::Static) || self.check(&TokenKind::Inline) || self.check(&TokenKind::Const) || self.check(&TokenKind::Naked) {
+        if self.check(&TokenKind::Fn)
+            || self.check(&TokenKind::Static)
+            || self.check(&TokenKind::Inline)
+            || self.check(&TokenKind::Const)
+            || self.check(&TokenKind::Naked)
+        {
             return self.parse_function(visibility);
         }
 
@@ -128,7 +142,7 @@ impl<'a> Parser<'a> {
             }
         }
         self.expect(&TokenKind::CloseBrace, "'}' after import list")?;
-        
+
         let from_tok = self.advance();
         if let TokenKind::Ident(ref s) = from_tok.kind {
             if s != "from" {
@@ -173,7 +187,11 @@ impl<'a> Parser<'a> {
         let mut methods = Vec::new();
         while !self.check(&TokenKind::CloseBrace) {
             let is_export = self.match_token(&TokenKind::Export);
-            let vis = if is_export { Visibility::Export } else { Visibility::Private };
+            let vis = if is_export {
+                Visibility::Export
+            } else {
+                Visibility::Private
+            };
             if let Item::Function(func) = self.parse_function(vis)? {
                 methods.push(func);
             }
@@ -200,7 +218,10 @@ impl<'a> Parser<'a> {
             } else {
                 None
             };
-            self.expect(&TokenKind::Semicolon, "';' after interface method signature")?;
+            self.expect(
+                &TokenKind::Semicolon,
+                "';' after interface method signature",
+            )?;
             methods.push(InterfaceMethod {
                 name: m_name,
                 params,
@@ -334,9 +355,16 @@ impl<'a> Parser<'a> {
         let mut methods = Vec::new();
 
         while !self.check(&TokenKind::CloseBrace) {
-            if self.check(&TokenKind::Export) || self.check(&TokenKind::Fn) || self.check(&TokenKind::Static) {
+            if self.check(&TokenKind::Export)
+                || self.check(&TokenKind::Fn)
+                || self.check(&TokenKind::Static)
+            {
                 let is_export = self.match_token(&TokenKind::Export);
-                let vis = if is_export { Visibility::Export } else { Visibility::Private };
+                let vis = if is_export {
+                    Visibility::Export
+                } else {
+                    Visibility::Private
+                };
                 if let Item::Function(func) = self.parse_function(vis)? {
                     methods.push(func);
                 }
@@ -389,6 +417,7 @@ impl<'a> Parser<'a> {
         let is_naked = self.match_token(&TokenKind::Naked);
 
         self.expect(&TokenKind::Fn, "'fn' keyword")?;
+        let span = self.current.span;
         let name = self.expect_ident("function name")?;
         let params = self.parse_params()?;
 
@@ -407,7 +436,10 @@ impl<'a> Parser<'a> {
             let block = self.parse_block()?;
             Some(FunctionBody::Block(block))
         } else {
-            self.expect(&TokenKind::Semicolon, "';' after extern function declaration")?;
+            self.expect(
+                &TokenKind::Semicolon,
+                "';' after extern function declaration",
+            )?;
             None
         };
 
@@ -421,7 +453,7 @@ impl<'a> Parser<'a> {
             params,
             return_type,
             body,
-            span: self.previous.span,
+            span,
         }))
     }
 
@@ -430,6 +462,7 @@ impl<'a> Parser<'a> {
         let mut params = Vec::new();
 
         while !self.check(&TokenKind::CloseParen) {
+            let span = self.current.span;
             let name = self.expect_ident("parameter name")?;
 
             let label = None;
@@ -447,7 +480,7 @@ impl<'a> Parser<'a> {
                 label,
                 ty,
                 default_val,
-                span: self.previous.span,
+                span,
             });
 
             if !self.match_token(&TokenKind::Comma) {
@@ -511,11 +544,27 @@ impl<'a> Parser<'a> {
                         break;
                     }
                 }
-                
+
                 if self.check(&TokenKind::Shr) {
                     let span = self.current.span;
-                    self.current = Token::new(TokenKind::Gt, Span { start: span.start + 1, end: span.end, line: span.line, col: span.col + 1 });
-                    self.previous = Token::new(TokenKind::Gt, Span { start: span.start, end: span.start + 1, line: span.line, col: span.col });
+                    self.current = Token::new(
+                        TokenKind::Gt,
+                        Span {
+                            start: span.start + 1,
+                            end: span.end,
+                            line: span.line,
+                            col: span.col + 1,
+                        },
+                    );
+                    self.previous = Token::new(
+                        TokenKind::Gt,
+                        Span {
+                            start: span.start,
+                            end: span.start + 1,
+                            line: span.line,
+                            col: span.col,
+                        },
+                    );
                 } else {
                     self.expect(&TokenKind::Gt, "'>' after generic type arguments")?;
                 }
@@ -555,6 +604,25 @@ impl<'a> Parser<'a> {
 
     fn parse_stmt(&mut self) -> Result<Stmt, String> {
         let span = self.current.span;
+
+        // Control transfers are statements; the AST already has their nodes.
+        if self.match_token(&TokenKind::Return) {
+            let value = if self.check(&TokenKind::Semicolon) {
+                None
+            } else {
+                Some(Box::new(self.parse_expr()?))
+            };
+            self.expect(&TokenKind::Semicolon, "';' after return")?;
+            return Ok(Stmt::Expr(Expr::Return(value, span), span));
+        }
+        if self.match_token(&TokenKind::Break) {
+            self.expect(&TokenKind::Semicolon, "';' after break")?;
+            return Ok(Stmt::Expr(Expr::Break(None, None, span), span));
+        }
+        if self.match_token(&TokenKind::Continue) {
+            self.expect(&TokenKind::Semicolon, "';' after continue")?;
+            return Ok(Stmt::Expr(Expr::Continue(None, span), span));
+        }
 
         if self.match_token(&TokenKind::Let) {
             let var = self.parse_var_decl(false)?;
@@ -624,8 +692,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_var_decl(&mut self, is_mut: bool) -> Result<VarDecl, String> {
+        let span = self.current.span;
         let name = self.expect_ident("variable name")?;
-        
+
         let ty;
         if self.match_token(&TokenKind::ColonEq) {
             ty = None;
@@ -645,7 +714,7 @@ impl<'a> Parser<'a> {
             is_mut,
             ty,
             value,
-            span: self.previous.span,
+            span,
         })
     }
 
@@ -769,7 +838,7 @@ impl<'a> Parser<'a> {
 
             TokenKind::Ident(s) => {
                 // Check if this is a struct initializer: 'Point { .x = 10 }'
-                if self.check(&TokenKind::OpenBrace) {
+                if self.allow_struct_init && self.check(&TokenKind::OpenBrace) {
                     return self.parse_struct_init(TypeExpr::Named(s, tok.span));
                 }
                 Ok(Expr::Ident(s, tok.span))
@@ -929,12 +998,31 @@ impl<'a> Parser<'a> {
             self.parse_block()
         } else {
             let expr = self.parse_expr()?;
-            Ok(Block {
-                stmts: Vec::new(),
-                yield_expr: Some(Box::new(expr)),
-                span: self.previous.span,
-            })
+            let span = expr.span();
+            if matches!(expr, Expr::If(..)) {
+                Ok(Block {
+                    stmts: vec![Stmt::Expr(expr, span)],
+                    yield_expr: None,
+                    span,
+                })
+            } else {
+                Ok(Block {
+                    stmts: Vec::new(),
+                    yield_expr: Some(Box::new(expr)),
+                    span,
+                })
+            }
         }
+    }
+
+    fn parse_condition(&mut self, parenthesized: bool) -> Result<Expr, String> {
+        let old = self.allow_struct_init;
+        if !parenthesized {
+            self.allow_struct_init = false;
+        }
+        let result = self.parse_expr();
+        self.allow_struct_init = old;
+        result
     }
 
     fn parse_if(&mut self, start_span: Span) -> Result<Expr, String> {
@@ -954,10 +1042,16 @@ impl<'a> Parser<'a> {
             } else {
                 None
             };
-            return Ok(Expr::IfLet(var_name, Box::new(expr), then_block, else_block, start_span));
+            return Ok(Expr::IfLet(
+                var_name,
+                Box::new(expr),
+                then_block,
+                else_block,
+                start_span,
+            ));
         }
 
-        let cond = self.parse_expr()?;
+        let cond = self.parse_condition(has_paren)?;
         if has_paren {
             self.expect(&TokenKind::CloseParen, "')' after if condition")?;
         }
@@ -1030,7 +1124,7 @@ impl<'a> Parser<'a> {
 
     fn parse_while(&mut self, label: Option<String>, start_span: Span) -> Result<Expr, String> {
         let has_paren = self.match_token(&TokenKind::OpenParen);
-        let cond = self.parse_expr()?;
+        let cond = self.parse_condition(has_paren)?;
         if has_paren {
             self.expect(&TokenKind::CloseParen, "')' after while condition")?;
         }
@@ -1052,7 +1146,13 @@ impl<'a> Parser<'a> {
                     self.expect(&TokenKind::CloseParen, "')' after for-in loop")?;
                 }
                 let block = self.parse_block()?;
-                return Ok(Expr::ForIn(label, var_name.clone(), Box::new(iter_expr), block, start_span));
+                return Ok(Expr::ForIn(
+                    label,
+                    var_name.clone(),
+                    Box::new(iter_expr),
+                    block,
+                    start_span,
+                ));
             }
         }
 
@@ -1066,10 +1166,20 @@ impl<'a> Parser<'a> {
             let lhs = self.parse_expr()?;
             if self.match_token(&TokenKind::PlusEq) {
                 let rhs = self.parse_expr()?;
-                Expr::Binary(Box::new(lhs), BinaryOp::Add, Box::new(rhs), self.previous.span)
+                Expr::Binary(
+                    Box::new(lhs),
+                    BinaryOp::Add,
+                    Box::new(rhs),
+                    self.previous.span,
+                )
             } else if self.match_token(&TokenKind::MinusEq) {
                 let rhs = self.parse_expr()?;
-                Expr::Binary(Box::new(lhs), BinaryOp::Sub, Box::new(rhs), self.previous.span)
+                Expr::Binary(
+                    Box::new(lhs),
+                    BinaryOp::Sub,
+                    Box::new(rhs),
+                    self.previous.span,
+                )
             } else if self.match_token(&TokenKind::Eq) {
                 self.parse_expr()?
             } else {

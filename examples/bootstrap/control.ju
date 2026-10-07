@@ -1,0 +1,22 @@
+export fn main() {
+    let limit: i64 = 8;
+    var n: i64 = 0;
+    var total: i64 = 0;
+    while (n < limit) {
+        n += 1;
+        if (n == 3) {
+            continue;
+        }
+        if (n == 7) {
+            break;
+        } else {
+            total += n;
+        }
+    }
+    loop {
+        total *= 2;
+        break;
+    }
+    std.io.println("sum(1, 2, 4, 5, 6) * 2:");
+    std.io.printlnInt(total);
+}

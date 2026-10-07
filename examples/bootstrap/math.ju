@@ -1,0 +1,15 @@
+fn square(n: i64): i64 => n * n;
+
+fn factorial(n: i64): i64 {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+export fn main() {
+    std.io.println("square(7):");
+    std.io.printlnInt(square(7));
+    std.io.println("factorial(6):");
+    std.io.printlnInt(factorial(6));
+}
