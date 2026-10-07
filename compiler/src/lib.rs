@@ -1,6 +1,16 @@
 //! The Juyu Language Compiler Core Library.
 
+pub mod codegen;
+pub mod diagnostic;
+mod runtime;
+pub mod sema;
 pub mod syntax;
+
+/// Parse and validate the executable bootstrap subset.
+pub fn check_source(source: &str) -> Result<sema::Program, String> {
+    let ast = parse_source(source)?;
+    sema::analyze(&ast).map_err(|e| e.to_string())
+}
 
 pub use syntax::ast::SourceFile;
 pub use syntax::lexer::Lexer;

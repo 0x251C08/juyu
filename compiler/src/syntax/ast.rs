@@ -333,6 +333,67 @@ pub enum UnaryOp {
     AddressOf,
 }
 
+impl TypeExpr {
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Named(_, s)
+            | Self::Pointer(_, _, s)
+            | Self::Optional(_, s)
+            | Self::Slice(_, s)
+            | Self::Generic(_, _, s)
+            | Self::Array(_, _, s)
+            | Self::SentinelSlice(_, _, s)
+            | Self::ErrorUnion(_, _, s)
+            | Self::Tuple(_, s)
+            | Self::DynInterface(_, s)
+            | Self::Anytype(s) => *s,
+        }
+    }
+}
+impl Expr {
+    pub fn span(&self) -> Span {
+        match self {
+            Self::Int(_, _, s)
+            | Self::Float(_, s)
+            | Self::StringLit(_, s)
+            | Self::InterpolatedString(_, s)
+            | Self::BoolLit(_, s)
+            | Self::Ident(_, s)
+            | Self::Null(s)
+            | Self::Undefined(s)
+            | Self::Unreachable(s)
+            | Self::Builtin(_, _, s)
+            | Self::Binary(_, _, _, s)
+            | Self::Unary(_, _, s)
+            | Self::Call(_, _, s)
+            | Self::MethodCall(_, _, _, s)
+            | Self::MemberAccess(_, _, s)
+            | Self::OptionalChaining(_, _, s)
+            | Self::Deref(_, s)
+            | Self::Index(_, _, s)
+            | Self::Slice(_, _, _, s)
+            | Self::StructInit(_, _, s)
+            | Self::Tuple(_, s)
+            | Self::If(_, _, _, s)
+            | Self::IfLet(_, _, _, _, s)
+            | Self::Match(_, _, s)
+            | Self::Loop(_, _, s)
+            | Self::While(_, _, _, s)
+            | Self::ForC(_, _, _, _, _, s)
+            | Self::ForIn(_, _, _, _, s)
+            | Self::Break(_, _, s)
+            | Self::Continue(_, s)
+            | Self::Return(_, s)
+            | Self::Try(_, s)
+            | Self::Catch(_, _, _, s)
+            | Self::NullCoalesce(_, _, s)
+            | Self::ForceUnwrap(_, s)
+            | Self::Cast(_, _, s) => *s,
+            Self::Block(b) => b.span,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -341,23 +402,23 @@ mod tests {
     #[test]
     fn test_ast_nodes_can_be_constructed() {
         let span = Span::dummy();
-        
+
         let vis = Visibility::Export;
-        
+
         let slice_type = TypeExpr::Slice(Box::new(TypeExpr::Named("u8".to_string(), span)), span);
-        
+
         let generic_type = TypeExpr::Generic(
             Box::new(TypeExpr::Named("List".to_string(), span)),
             vec![TypeExpr::Named("T".to_string(), span)],
-            span
+            span,
         );
-        
+
         let expr = Expr::Cast(
             Box::new(Expr::Int(42, None, span)),
             TypeExpr::Named("u64".to_string(), span),
-            span
+            span,
         );
-        
+
         assert_eq!(vis, Visibility::Export);
         assert!(matches!(slice_type, TypeExpr::Slice(_, _)));
         assert!(matches!(generic_type, TypeExpr::Generic(_, _, _)));
